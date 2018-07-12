@@ -24,7 +24,7 @@ public class WorkerTask implements Runnable {
 
 	@Override
 	public void run() {
-		logger.info("Running Task: AppId: %s, TaskId: %s, started at %s with endpoint %s. Current Time : %s", this.appId, this.taskId, this.startTime,
+		logger.info("Running Task: AppId: {}, TaskId: {}, started at {} with endpoint {}. Current Time : {}", this.appId, this.taskId, this.startTime,
 				this.endpoint, Instant.now().toString());
 		if (!StringUtils.isEmpty(this.endpoint)) {
 			testConnectivity();

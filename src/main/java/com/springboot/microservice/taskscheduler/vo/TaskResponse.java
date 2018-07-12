@@ -12,7 +12,7 @@ public class TaskResponse {
 	private String startTime = null;
 	private String lastSuccessStartTime = null;
 	private String lastFailStartTime = null;
-	private String failureReason = null;
+	private String message = null;
 
 	public TaskResponse() {
 		// TODO Auto-generated constructor stub
@@ -66,20 +66,30 @@ public class TaskResponse {
 		this.lastFailStartTime = lastFailStartTime;
 	}
 
-	public String getFailureReason() {
-		return failureReason;
+	public String getMessage() {
+		return message;
 	}
 
-	public void setFailureReason(String failureReason) {
-		this.failureReason = failureReason;
+	public void setMessage(String message) {
+		this.message = message;
 	}
 
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("TaskResponse [appId=").append(appName).append(", taskName=").append(taskName).append(", taskStatus=").append(taskStatus)
-				.append(", startTime=").append(startTime).append(", lastSuccessStartTime=").append(lastSuccessStartTime)
-				.append(", lastFailStartTime=").append(lastFailStartTime).append("]");
+		builder.append("TaskResponse [appId=")
+				.append(appName)
+				.append(", taskName=")
+				.append(taskName)
+				.append(", taskStatus=")
+				.append(taskStatus)
+				.append(", startTime=")
+				.append(startTime)
+				.append(", lastSuccessStartTime=")
+				.append(lastSuccessStartTime)
+				.append(", lastFailStartTime=")
+				.append(lastFailStartTime)
+				.append("]");
 		return builder.toString();
 	}
 

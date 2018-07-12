@@ -32,7 +32,11 @@ logging:
       springframework:
         security: DEBUG
         web: ERROR    
-      hibernate: DEBUG   
+      hibernate: DEBUG 
+    com:
+      springboot:
+        microservice:
+          taskscheduler: INFO  
 
 
       
