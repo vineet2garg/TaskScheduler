@@ -1,5 +1,9 @@
 package com.springboot.microservice.taskscheduler;
 
+import java.util.TimeZone;
+
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +18,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.springboot.microservice.taskscheduler.controller.TaskSchedulerController;
+import com.springboot.microservice.taskscheduler.exception.TaskScheduleExceptionHandler;
 
 import springfox.documentation.builders.ApiInfoBuilder;
 import springfox.documentation.builders.PathSelectors;
@@ -26,7 +31,7 @@ import springfox.documentation.swagger2.annotations.EnableSwagger2;
 @SpringBootApplication
 @EnableSwagger2
 @EnableJpaAuditing
-@ComponentScan(basePackageClasses = { TaskSchedulerController.class })
+@ComponentScan(basePackageClasses = { TaskSchedulerController.class, TaskScheduleExceptionHandler.class })
 public class TaskSchedulerApplication {
 	private static final Logger logger = LoggerFactory.getLogger(TaskSchedulerApplication.class);
 
@@ -68,5 +73,10 @@ public class TaskSchedulerApplication {
 	private Predicate<String> paths() {
 		// Match all paths except /error
 		return Predicates.and(PathSelectors.regex("/.*"), Predicates.not(PathSelectors.regex("/error.*")));
+	}
+	
+	@PostConstruct
+	void init() {
+		TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
 	}
 }

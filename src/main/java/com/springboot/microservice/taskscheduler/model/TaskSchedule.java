@@ -5,7 +5,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.SequenceGenerator;
 import javax.persistence.Table;
-import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
 @Entity
@@ -17,27 +17,27 @@ public class TaskSchedule {
 	@SequenceGenerator(name = "task_schedule_generator", sequenceName = "task_schedule_sequence", initialValue = 1000)
 	private Long id;
 
-	@NotBlank
+	@NotNull
 	@Size(min = 3, max = 100)
 	private String appId;
 
-	@NotBlank
+	@NotNull
 	@Size(min = 3, max = 100)
 	private String appName;
 
-	@NotBlank
+	@NotNull
 	@Size(min = 3, max = 100)
 	private String taskId;
 
-	@NotBlank
+	@NotNull
 	@Size(min = 3, max = 100)
 	private String taskName;
 
-	@NotBlank
+	@NotNull
 	@Size(min = 3, max = 100)
 	private String taskStatus;
 
-	@NotBlank
+	@NotNull
 	@Size(min = 3, max = 100)
 	private String executionType;
 
@@ -167,11 +167,13 @@ public class TaskSchedule {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("ApplicationPollTask [appId=").append(appId).append(", appName=").append(appName).append(", taskId=").append(taskId)
-				.append(", taskName=").append(taskName).append(", taskStatus=").append(taskStatus).append(", executionType=").append(executionType)
-				.append(", fixedExecutionInterval=").append(fixedExecutionInterval).append(", fixedExecutionUnit=").append(fixedExecutionUnit)
-				.append(", cronExpression=").append(cronExpression).append(", executionStartTime=").append(executionStartTime)
-				.append(", lastSuccessExecutionStartTime=").append(lastSuccessExecutionStartTime).append(", lastFailExecutionStartTime=")
+		builder.append("ApplicationPollTask [appId=").append(appId).append(", appName=").append(appName)
+				.append(", taskId=").append(taskId).append(", taskName=").append(taskName).append(", taskStatus=")
+				.append(taskStatus).append(", executionType=").append(executionType).append(", fixedExecutionInterval=")
+				.append(fixedExecutionInterval).append(", fixedExecutionUnit=").append(fixedExecutionUnit)
+				.append(", cronExpression=").append(cronExpression).append(", executionStartTime=")
+				.append(executionStartTime).append(", lastSuccessExecutionStartTime=")
+				.append(lastSuccessExecutionStartTime).append(", lastFailExecutionStartTime=")
 				.append(lastFailExecutionStartTime).append("]");
 		return builder.toString();
 	}

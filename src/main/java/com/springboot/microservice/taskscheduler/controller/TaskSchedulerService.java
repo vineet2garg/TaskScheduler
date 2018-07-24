@@ -3,6 +3,7 @@ package com.springboot.microservice.taskscheduler.controller;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -39,7 +40,7 @@ public class TaskSchedulerService {
 		List<TaskResponse> response = new ArrayList<>();
 		List<TaskSchedule> taskScheduled = taskSchedulerRepository.findAll();
 		for (TaskSchedule task : taskScheduled) {
-			response.add(generateTaskResponse(task));
+			response.add(generateTaskResponse(task, null));
 		}
 		logger.info("Fetching List of Applications : " + response);
 		return response;
@@ -50,45 +51,47 @@ public class TaskSchedulerService {
 
 		List<TaskSchedule> taskScheduled = taskSchedulerRepository.findByAppId(appId);
 		for (TaskSchedule task : taskScheduled) {
-			response.add(generateTaskResponse(task));
+			response.add(generateTaskResponse(task, null));
 		}
 		logger.info("Fetching List of Tasks for an Applications : " + response);
 		return response;
 	}
 
 	public TaskResponse getTaskDetails(String appId, String taskId) {
-		TaskSchedule taskSchedule = taskSchedulerRepository.findByAppIdAndTaskId(appId, taskId);
-		TaskResponse response = generateTaskResponse(taskSchedule);
+		TaskSchedule taskSchedule = taskSchedulerRepository.findByAppIdAndTaskId(appId, taskId).orElse(null);
+
+		TaskResponse response = new TaskResponse();
+		if (null != taskSchedule) {
+			response = generateTaskResponse(taskSchedule, null);
+		} else {
+			response.setAppId(appId);
+			response.setTaskId(taskId);
+			response.setTaskStatus(TaskStatus.FAILED.name());
+			response.setMessage("No Task in DB.");
+		}
 		logger.info("Fetching details of a Task for an Applications : " + response);
 		return response;
 	}
 
 	public TaskResponse createTaskForApplication(String appId, String taskId, TaskRequest request) {
-		TaskSchedule taskScheduleId = upsertTaskInfoToDB(appId, taskId, TaskStatus.CREATED, request, true);
-		TaskResponse response = new TaskResponse();
-		response.setAppName(taskScheduleId.getAppName());
-		response.setTaskName(taskScheduleId.getTaskName());
-		response.setTaskStatus(TaskStatus.CREATED);
-		response.setMessage("Task Created Successfully.");
+		TaskSchedule taskSchedule = upsertTaskInfoToDB(appId, taskId, TaskStatus.CREATED, request, true);
+		TaskResponse response = generateTaskResponse(taskSchedule, "Task Created Successfully.");
 		return response;
 	}
 
 	public TaskResponse deleteTaskForApplication(String appId, String taskId, TaskRequest request) {
-		TaskSchedule taskSchedule = taskSchedulerRepository.findByAppIdAndTaskId(appId, taskId);
+		TaskSchedule taskSchedule = taskSchedulerRepository.findByAppIdAndTaskId(appId, taskId).orElse(null);
 		TaskResponse response = new TaskResponse();
 		if (null != taskSchedule) {
 			taskSchedulerRepository.delete(taskSchedule);
 
-			response.setAppName(taskSchedule.getAppName());
-			response.setTaskName(taskSchedule.getTaskName());
-			response.setTaskStatus(TaskStatus.DELETED);
-			response.setMessage("Task Deleted Successfully.");
+			response = generateTaskResponse(taskSchedule, "Task Deleted Successfully.");
+			response.setTaskStatus(TaskStatus.DELETED.name());
 		} else {
-			response.setAppName(appId);
-			response.setTaskName(taskId);
-			response.setTaskStatus(TaskStatus.FAILED);
+			response.setAppId(appId);
+			response.setTaskId(taskId);
+			response.setTaskStatus(TaskStatus.FAILED.name());
 			response.setMessage("No Task in DB.");
-
 		}
 		return response;
 	}
@@ -100,18 +103,17 @@ public class TaskSchedulerService {
 		TaskSchedule taskSchedule = upsertTaskInfoToDB(appId, taskId, TaskStatus.STARTED, null, false);
 		if (null != taskSchedule) {
 			// Start the Poller
-			scheduleTask(appId, taskId, taskSchedule);
+			if (scheduleTask(appId, taskId, taskSchedule)) {
+				response = generateTaskResponse(taskSchedule, "Task Started Successfully.");
+			} else {
+				taskSchedule = upsertTaskInfoToDB(appId, taskId, TaskStatus.DELETED, null, false);
+				response = generateTaskResponse(taskSchedule, "Invalid Task. It's Deleted.");
+			}
 
-			response.setAppName(taskSchedule.getAppName());
-			response.setTaskName(taskSchedule.getTaskName());
-			response.setTaskStatus(TaskStatus.STARTED);
-			response.setStartTime(taskSchedule.getExecutionStartTime());
-			response.setLastSuccessStartTime(taskSchedule.getLastSuccessExecutionStartTime());
-			response.setMessage("Task Started Successfully.");
 		} else {
-			response.setAppName(appId);
-			response.setTaskName(taskId);
-			response.setTaskStatus(TaskStatus.FAILED);
+			response.setAppId(appId);
+			response.setTaskId(taskId);
+			response.setTaskStatus(TaskStatus.FAILED.name());
 			response.setMessage("No Task in DB.");
 		}
 
@@ -124,114 +126,124 @@ public class TaskSchedulerService {
 		// Fetch the Task Details from DB
 		TaskSchedule taskSchedule = upsertTaskInfoToDB(appId, taskId, TaskStatus.STOPPED, null, false);
 		if (taskSchedule != null) {
-			ScheduledFuture<?> scheduledFuture = taskInExecution.get(taskSchedule.getId());
+			// Remove the Scheduler from Cache
+			ScheduledFuture<?> scheduledFuture = taskInExecution.remove(taskSchedule.getId());
 			if (scheduledFuture != null && scheduledFuture.cancel(false)) {
-				response.setStartTime(taskSchedule.getExecutionStartTime());
-				response.setTaskStatus(TaskStatus.STOPPED);
-				response.setMessage("Task Stopped Successfully.");
-
-				// Remove the Scheduler from Cache
-				taskInExecution.remove(taskSchedule.getId());
+				response = generateTaskResponse(taskSchedule, "Task Stopped Successfully.");
 			} else {
-				response.setTaskStatus(TaskStatus.FAILED);
-				response.setMessage("Task Failed to Stop the task or task is not running.");
+				response = generateTaskResponse(taskSchedule, "Task is not running.");
 			}
-
-			response.setLastSuccessStartTime(taskSchedule.getLastSuccessExecutionStartTime());
-			response.setAppName(taskSchedule.getAppName());
-			response.setTaskName(taskSchedule.getTaskName());
 		} else {
-			response.setAppName(appId);
-			response.setTaskName(taskId);
-			response.setTaskStatus(TaskStatus.FAILED);
+			response.setAppId(appId);
+			response.setTaskId(taskId);
+			response.setTaskStatus(TaskStatus.FAILED.name());
 			response.setMessage("No Task in DB.");
 		}
-
 		return response;
 	}
 
-	private void scheduleTask(String appId, String taskId, TaskSchedule taskSchedule) {
-		ScheduledFuture<?> scheduledFuture = null;
-		WorkerTask workerTask = new WorkerTask(appId, taskId, String.valueOf(Instant.now()), taskSchedule.getEndpoint());
+	private boolean scheduleTask(String appId, String taskId, TaskSchedule taskSchedule) {
+		boolean started = false;
+		Trigger trigger = null;
 		switch (TaskExecutionType.valueOf(taskSchedule.getExecutionType())) {
-			case FIXED:
-				// Fixed Periodic Trigger
-				// import java.util.concurrent.TimeUnit;
-				Trigger perodicTrigger = new PeriodicTrigger(Integer.valueOf(taskSchedule.getFixedExecutionInterval()),
-						TimeUnit.valueOf(taskSchedule.getFixedExecutionUnit()));
-				scheduledFuture = taskScheduler.schedule(workerTask, perodicTrigger);
-				break;
-			case CRON:
-				// CRON Expression Trigger
-				Trigger cronTrigger = new CronTrigger(taskSchedule.getCronExpression());
-				scheduledFuture = taskScheduler.schedule(workerTask, cronTrigger);
-				break;
-			default:
-				logger.error("Incorrect Execution Type : {}", taskSchedule.getExecutionType());
+		case FIXED:
+			// Fixed Periodic Trigger
+			// import java.util.concurrent.TimeUnit;
+			trigger = new PeriodicTrigger(Integer.valueOf(taskSchedule.getFixedExecutionInterval()),
+					TimeUnit.valueOf(taskSchedule.getFixedExecutionUnit()));
+			break;
+		case CRON:
+			// CRON Expression Trigger
+			trigger = new CronTrigger(taskSchedule.getCronExpression());
+			break;
+		default:
+			logger.error("Incorrect Execution Type : {}", taskSchedule.getExecutionType());
 		}
 
-		this.taskInExecution.putIfAbsent(taskSchedule.getId(), scheduledFuture);
+		if (null != trigger) {
+			WorkerTask workerTask = new WorkerTask(appId, taskId, String.valueOf(Instant.now()),
+					taskSchedule.getEndpoint());
+			this.taskInExecution.putIfAbsent(taskSchedule.getId(), taskScheduler.schedule(workerTask, trigger));
+
+			started = true;
+		}
+
+		return started;
 	}
 
-	private TaskSchedule upsertTaskInfoToDB(String appId, String taskId, TaskStatus taskStatus, TaskRequest request, boolean create) {
+	private TaskSchedule upsertTaskInfoToDB(String appId, String taskId, TaskStatus taskStatus, TaskRequest request,
+			boolean create) {
 		// Check for previous task
-		TaskSchedule taskSchedule = taskSchedulerRepository.findByAppIdAndTaskId(appId, taskId);
-		if (null == taskSchedule && !create) {
+		TaskSchedule taskSchedule = taskSchedulerRepository.findByAppIdAndTaskId(appId, taskId)
+				.orElse(create ? createTaskScheduleObj(appId, taskId, request) : null);
+		if (null == taskSchedule) {
 			return taskSchedule;
 		}
 
-		if (null == taskSchedule) {
-			// Adding to DB
-			taskSchedule = new TaskSchedule();
-			taskSchedule.setAppId(appId);
-			taskSchedule.setAppName(request.getAppName());
-			taskSchedule.setTaskId(taskId);
-			taskSchedule.setTaskName(request.getTaskName());
-
-			taskSchedule.setExecutionType(String.valueOf(request.getExecutionType()));
-			switch (request.getExecutionType()) {
-				case CRON:
-					taskSchedule.setFixedExecutionInterval("");
-					taskSchedule.setFixedExecutionUnit("");
-					taskSchedule.setCronExpression(request.getCronExpression());
-					break;
-				case FIXED:
-					taskSchedule.setFixedExecutionInterval(request.getFixedExecutionInterval());
-					taskSchedule.setFixedExecutionUnit(request.getFixedExecutionUnit());
-					taskSchedule.setCronExpression("");
-					break;
-				default:
-					logger.error("Incorrect Execution Type : {}", request.getExecutionType());
-			}
-
-			taskSchedule.setEndpoint(request.getEndpoint());
-		}
-
 		switch (taskStatus) {
-			case STARTED:
-				taskSchedule.setExecutionStartTime(String.valueOf(Instant.now()));
-				break;
-			case STOPPED:
-				taskSchedule.setLastSuccessExecutionStartTime(taskSchedule.getExecutionStartTime());
-				break;
-			default:
-				logger.debug("No Action");
+		case STARTED:
+			taskSchedule.setExecutionStartTime(String.valueOf(Instant.now()));
+			break;
+		case STOPPED:
+			taskSchedule.setLastSuccessExecutionStartTime(taskSchedule.getExecutionStartTime());
+			break;
+		default:
+			logger.debug("No Action");
 		}
 
 		taskSchedule.setTaskStatus(taskStatus.name());
-		taskSchedulerRepository.saveAndFlush(taskSchedule);
+		taskSchedule = taskSchedulerRepository.saveAndFlush(taskSchedule);
 		logger.info("Task Saved : {}", taskSchedule);
 
 		return taskSchedule;
 	}
 
-	private TaskResponse generateTaskResponse(TaskSchedule taskSchedule) {
+	private TaskSchedule createTaskScheduleObj(String appId, String taskId, TaskRequest request) {
+		TaskSchedule taskSchedule = new TaskSchedule();
+		taskSchedule.setAppId(appId);
+		taskSchedule.setAppName(request.getAppName());
+		taskSchedule.setTaskId(taskId);
+		taskSchedule.setTaskName(request.getTaskName());
+
+		taskSchedule.setExecutionType(String.valueOf(request.getExecutionType()));
+		taskSchedule.setEndpoint(request.getEndpoint());
+
+		switch (TaskExecutionType.valueOf(request.getExecutionType())) {
+		case CRON:
+			taskSchedule.setFixedExecutionInterval("");
+			taskSchedule.setFixedExecutionUnit("");
+			taskSchedule.setCronExpression(request.getCronExpression());
+			break;
+		case FIXED:
+			taskSchedule.setFixedExecutionInterval(request.getFixedExecutionInterval());
+			taskSchedule.setFixedExecutionUnit(request.getFixedExecutionUnit());
+			taskSchedule.setCronExpression("");
+			break;
+		default:
+			logger.error("Incorrect Execution Type : {}", request.getExecutionType());
+		}
+
+		return taskSchedule;
+
+	}
+
+	private TaskResponse generateTaskResponse(TaskSchedule taskSchedule, String message) {
 		TaskResponse taskResponse = new TaskResponse();
+		taskResponse.setAppId(taskSchedule.getAppId());
 		taskResponse.setAppName(taskSchedule.getAppName());
+		taskResponse.setTaskId(taskSchedule.getTaskId());
 		taskResponse.setTaskName(taskSchedule.getTaskName());
-		taskResponse.setTaskStatus(TaskStatus.valueOf(taskSchedule.getTaskStatus()));
+		taskResponse.setTaskStatus(taskSchedule.getTaskStatus());
 		taskResponse.setStartTime(taskSchedule.getExecutionStartTime());
 		taskResponse.setLastSuccessStartTime(taskSchedule.getLastSuccessExecutionStartTime());
+
+		taskResponse.setCronExpression(Optional.of(taskSchedule.getCronExpression()).get());
+		taskResponse.setExecutionType(taskSchedule.getExecutionType());
+		taskResponse.setFixedExecutionInterval(taskSchedule.getFixedExecutionInterval());
+		taskResponse.setFixedExecutionUnit(taskSchedule.getFixedExecutionUnit());
+
+		taskResponse.setMessage(message);
+
 		return taskResponse;
 	}
 }

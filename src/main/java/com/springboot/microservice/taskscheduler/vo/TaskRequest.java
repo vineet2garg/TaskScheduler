@@ -1,15 +1,19 @@
 package com.springboot.microservice.taskscheduler.vo;
 
+import javax.validation.constraints.Min;
+
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.springboot.microservice.taskscheduler.model.TaskExecutionType;
+import com.springboot.microservice.taskscheduler.validation.ValidExecutionType;
 
 @JsonSerialize
 public class TaskRequest {
 	private String appName = null;
 	private String taskName = null;
 
-	private TaskExecutionType executionType;
+	@ValidExecutionType
+	private String executionType;
 
+	@Min(value = 0)
 	private String fixedExecutionInterval;
 	private String fixedExecutionUnit;
 
@@ -37,11 +41,11 @@ public class TaskRequest {
 		this.taskName = taskName;
 	}
 
-	public TaskExecutionType getExecutionType() {
+	public String getExecutionType() {
 		return executionType;
 	}
 
-	public void setExecutionType(TaskExecutionType executionType) {
+	public void setExecutionType(String executionType) {
 		this.executionType = executionType;
 	}
 
@@ -80,21 +84,10 @@ public class TaskRequest {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("TaskRequest [appName=")
-				.append(appName)
-				.append(", taskName=")
-				.append(taskName)
-				.append(", executionType=")
-				.append(executionType)
-				.append(", fixedExecutionInterval=")
-				.append(fixedExecutionInterval)
-				.append(", fixedExecutionUnit=")
-				.append(fixedExecutionUnit)
-				.append(", cronExpression=")
-				.append(cronExpression)
-				.append(", endpoint=")
-				.append(endpoint)
-				.append("]");
+		builder.append("TaskRequest [appName=").append(appName).append(", taskName=").append(taskName)
+				.append(", executionType=").append(executionType).append(", fixedExecutionInterval=")
+				.append(fixedExecutionInterval).append(", fixedExecutionUnit=").append(fixedExecutionUnit)
+				.append(", cronExpression=").append(cronExpression).append(", endpoint=").append(endpoint).append("]");
 		return builder.toString();
 	}
 

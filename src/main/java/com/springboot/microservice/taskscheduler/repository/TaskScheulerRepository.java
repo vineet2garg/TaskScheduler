@@ -1,6 +1,7 @@
 package com.springboot.microservice.taskscheduler.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,5 +19,5 @@ public interface TaskScheulerRepository extends JpaRepository<TaskSchedule, Long
 	public List<TaskSchedule> findByTaskStatus(String taskStatus);
 
 	@Query("SELECT ts FROM TaskSchedule ts WHERE ts.appId = :appId AND ts.taskId = :taskId")
-	public TaskSchedule findByAppIdAndTaskId(@Param("appId") String appId, @Param("taskId") String taskId);
+	public Optional<TaskSchedule> findByAppIdAndTaskId(@Param("appId") String appId, @Param("taskId") String taskId);
 }
